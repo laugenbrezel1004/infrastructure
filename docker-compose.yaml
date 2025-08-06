@@ -12,24 +12,12 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./certs:/etc/nginx/certs:ro
     depends_on:
-      - uptime-kuma
       - jenkins
       - gitlab
       - sonarqube
-      - nexus
     networks:
       - proxy-network
-
-  # Uptime-Kuma (monitoring.laurenzschmidt.de)
-  uptime-kuma:
-    image: louislam/uptime-kuma:latest
-    container_name: uptime-kuma
-    restart: always
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro  # Mount Docker socket for executing Docker commands
-      - uptime_kuma_data:/app/data
-    networks:
-      - proxy-network
+  
 
   # Gitlab (gitlab.laurenzschmidt.de)
   gitlab:
@@ -95,23 +83,10 @@ services:
       dockerfile: jenkins-docker
     depends_on:
       - gitlab
-      - nexus
     volumes:
       - ./certs:/etc/jenkins/certs:ro
       - /var/run/docker.sock:/var/run/docker.sock  # Mount Docker socket for executing Docker commands
       - jenkins_home:/var/jenkins_home
-    networks:
-      - proxy-network
-
-  # Nexus (nexus.laurenzschmidt.de)
-  nexus:
-    image: sonatype/nexus3:latest
-    container_name: nexus
-    restart: always
-    ports:
-      - "5000:5000"
-    volumes:
-      - nexus_data:/nexus-data
     networks:
       - proxy-network
 
@@ -121,9 +96,6 @@ networks:
     driver: bridge
 
 volumes:
-  # Uptime-Kuma
-  uptime_kuma_data:
-
   # GitLab
   gitlab_config:
   gitlab_logs:
@@ -137,6 +109,3 @@ volumes:
 
   # Jenkins
   jenkins_home:
-
-  # Nexus
-  nexus_data:
