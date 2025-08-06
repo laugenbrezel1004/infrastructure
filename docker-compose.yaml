@@ -1,0 +1,142 @@
+services:
+
+  # Nginx Reverse Proxy
+  nginx-reverse-proxy:
+    image: nginx:latest
+    container_name: nginx-reverse-proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - uptime-kuma
+      - jenkins
+      - gitlab
+      - sonarqube
+      - nexus
+    networks:
+      - proxy-network
+
+  # Uptime-Kuma (monitoring.laurenzschmidt.de)
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # Mount Docker socket for executing Docker commands
+      - uptime_kuma_data:/app/data
+    networks:
+      - proxy-network
+
+  # Gitlab (gitlab.laurenzschmidt.de)
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    container_name: gitlab
+    restart: always
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'https://gitlab.laurenzschmidt.de'
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['ssl_certificate'] = "/etc/gitlab/ssl/gitlab.laurenzschmidt.de.crt"
+        nginx['ssl_certificate_key'] = "/etc/gitlab/ssl/gitlab.laurenzschmidt.de.key"
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+    ports:
+      - "2222:22"
+    volumes:
+      - ./certs:/etc/gitlab/ssl:ro
+      - gitlab_config:/etc/gitlab
+      - gitlab_logs:/var/log/gitlab
+      - gitlab_data:/var/opt/gitlab
+    networks:
+      - proxy-network
+
+  # SonarQube (sonarqube.laurenzschmidt.de)
+  sonarqube:
+    image: mc1arke/sonarqube-with-community-branch-plugin
+    container_name: sonarqube
+    restart: always
+    environment:
+      SONAR_JDBC_URL: "jdbc:postgresql://sonarqube-db:5432/sonar"
+      SONAR_JDBC_USERNAME: "sonar"
+      SONAR_JDBC_PASSWORD: "sonar"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    depends_on:
+      - sonarqube-db
+    networks:
+      - proxy-network
+
+  sonarqube-db:
+    image: postgres:13
+    container_name: sonarqube-db
+    restart: always
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonar
+    volumes:
+      - sonarqube_db_data:/var/lib/postgresql/data
+    networks:
+      - proxy-network
+
+  # Jenkins (jenkins.laurenzschmidt.de)
+  jenkins:
+    # image: registry.laurenzschmidt.de/jenkins-docker:lts
+    container_name: jenkins
+    restart: always
+    build:
+#      context: jenkins-docker
+      dockerfile: jenkins-docker
+    depends_on:
+      - gitlab
+      - nexus
+    volumes:
+      - ./certs:/etc/jenkins/certs:ro
+      - /var/run/docker.sock:/var/run/docker.sock  # Mount Docker socket for executing Docker commands
+      - jenkins_home:/var/jenkins_home
+    networks:
+      - proxy-network
+
+  # Nexus (nexus.laurenzschmidt.de)
+  nexus:
+    image: sonatype/nexus3:latest
+    container_name: nexus
+    restart: always
+    ports:
+      - "5000:5000"
+    volumes:
+      - nexus_data:/nexus-data
+    networks:
+      - proxy-network
+
+
+networks:
+  proxy-network: # Reverse-Proxy-Network
+    driver: bridge
+
+volumes:
+  # Uptime-Kuma
+  uptime_kuma_data:
+
+  # GitLab
+  gitlab_config:
+  gitlab_logs:
+  gitlab_data:
+
+  # SonarQube
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  sonarqube_db_data:
+
+  # Jenkins
+  jenkins_home:
+
+  # Nexus
+  nexus_data:
