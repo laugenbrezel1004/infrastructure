@@ -23,6 +23,8 @@ services:
     image: httpd:latest
     container_name: apache
     restart: always
+    volumes:
+      - ./apache2/htdocs:/usr/local/apache2/htdocs:ro
     networks:
       - proxy-network
 
