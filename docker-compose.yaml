@@ -15,9 +15,16 @@ services:
       - jenkins
       - gitlab
       - sonarqube
+      - apache
     networks:
       - proxy-network
-  
+ 
+  apache:
+    image: httpd:latest
+    container_name: apache
+    restart: always
+    networks:
+      - proxy-network
 
   # Gitlab (gitlab.laurenzschmidt.de)
   gitlab:
