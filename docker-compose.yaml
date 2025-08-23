@@ -1,9 +1,16 @@
-services:
+  # vaultwarden
+  # nextcloud
+  # minecraft
+  # backupstrategie
+  # fail2ban
+  # guacamole
+  # huly.io
+  # samba
 
-  # Nginx Reverse Proxy
+services:
   nginx-reverse-proxy:
     image: nginx:latest
-    container_name: nginx-reverse-proxy
+    container_name: infrastructure_nginx-reverse-proxy
     restart: always
     ports:
       - "80:80"
@@ -11,35 +18,29 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./certs:/etc/nginx/certs:ro
-    depends_on:
-      - jenkins
-      - gitlab
-      - sonarqube
-      - apache
     networks:
       - proxy-network
- 
+
   apache:
     image: httpd:latest
-    container_name: apache
+    container_name: infrastructure_apache
     restart: always
     volumes:
       - ./apache2/htdocs:/usr/local/apache2/htdocs:ro
     networks:
       - proxy-network
 
-  # Gitlab (gitlab.laurenzschmidt.de)
   gitlab:
     image: gitlab/gitlab-ce:latest
-    container_name: gitlab
+    container_name: infrastructure_gitlab
     restart: always
+    depends_on:
+      - nginx-reverse-proxy
     environment:
       GITLAB_OMNIBUS_CONFIG: |
-        external_url 'https://gitlab.laurenzschmidt.de'
+        external_url 'http://gitlab.laurenzschmidt.de'
         nginx['listen_port'] = 80
         nginx['listen_https'] = false
-        nginx['ssl_certificate'] = "/etc/gitlab/ssl/gitlab.laurenzschmidt.de.crt"
-        nginx['ssl_certificate_key'] = "/etc/gitlab/ssl/gitlab.laurenzschmidt.de.key"
         gitlab_rails['gitlab_shell_ssh_port'] = 2222
     ports:
       - "2222:22"
@@ -51,70 +52,27 @@ services:
     networks:
       - proxy-network
 
-  # SonarQube (sonarqube.laurenzschmidt.de)
-  sonarqube:
-    image: mc1arke/sonarqube-with-community-branch-plugin
-    container_name: sonarqube
-    restart: always
-    environment:
-      SONAR_JDBC_URL: "jdbc:postgresql://sonarqube-db:5432/sonar"
-      SONAR_JDBC_USERNAME: "sonar"
-      SONAR_JDBC_PASSWORD: "sonar"
-    volumes:
-      - sonarqube_data:/opt/sonarqube/data
-      - sonarqube_extensions:/opt/sonarqube/extensions
-      - sonarqube_logs:/opt/sonarqube/logs
-    depends_on:
-      - sonarqube-db
-    networks:
-      - proxy-network
-
-  sonarqube-db:
-    image: postgres:13
-    container_name: sonarqube-db
-    restart: always
-    environment:
-      POSTGRES_USER: sonar
-      POSTGRES_PASSWORD: sonar
-      POSTGRES_DB: sonar
-    volumes:
-      - sonarqube_db_data:/var/lib/postgresql/data
-    networks:
-      - proxy-network
-
-  # Jenkins (jenkins.laurenzschmidt.de)
   jenkins:
-    # image: registry.laurenzschmidt.de/jenkins-docker:lts
-    container_name: jenkins
+    container_name: infrastructure_jenkins
     restart: always
-    build:
-#      context: jenkins-docker
-      dockerfile: jenkins-docker
     depends_on:
-      - gitlab
+      - nginx-reverse-proxy
+    build:
+      dockerfile: jenkins-docker
     volumes:
       - ./certs:/etc/jenkins/certs:ro
-      - /var/run/docker.sock:/var/run/docker.sock  # Mount Docker socket for executing Docker commands
+      - /var/run/docker.sock:/var/run/docker.sock
       - jenkins_home:/var/jenkins_home
     networks:
       - proxy-network
 
-
 networks:
-  proxy-network: # Reverse-Proxy-Network
+  proxy-network:
     driver: bridge
 
 volumes:
-  # GitLab
   gitlab_config:
   gitlab_logs:
   gitlab_data:
-
-  # SonarQube
-  sonarqube_data:
-  sonarqube_extensions:
-  sonarqube_logs:
-  sonarqube_db_data:
-
-  # Jenkins
   jenkins_home:
+  vaultwarden-data:
